@@ -1,0 +1,160 @@
+// Example of schedular using Quartz.net, Example of schedular that will create two jobs parellelly
+
+using GetHealth.BillingScheduler.Common;
+using Quartz;
+using Quartz.Impl;
+
+namespace Demo.App
+{
+    /// <summary>
+    /// Schedular class that generates invoice and deduct bill amount from customer's card
+    /// </summary>
+    public class DailyJobScheduler
+    {
+        /// <summary>
+        /// Starts the daily billing schedular
+        /// </summary>
+        public void Start()
+        {
+            IScheduler scheduler = StdSchedulerFactory.GetDefaultScheduler();
+            scheduler.Start();
+
+            //Create and Schedule job for customer billing
+            IJobDetail billingJob = JobBuilder.Create<DailyBillingJob>().Build();
+            scheduler.ScheduleJob(billingJob, GetCustomerBillingTrigger(billingJob));
+
+            //Create and Schedule job for failed payment process
+            IJobDetail failedPaymentProcessJob = JobBuilder.Create<DailyFailedRecordProcessJob>().Build();
+            scheduler.ScheduleJob(failedPaymentProcessJob, GetFailedPaymentProcessTrigger(failedPaymentProcessJob));
+        }
+
+
+        /// <summary>
+        /// Gets the trigger details for failed payment process job
+        /// </summary>
+        /// <param name="job"></param>
+        /// <returns></returns>
+        private ITrigger GetCustomerBillingTrigger(IJobDetail job)
+        {
+            //Trigger the created job
+            var dailyExecutionTime = ServiceConfigurationKeys.DailyBillingGenerationStartTime;
+            var trigger = TriggerBuilder.Create()
+                .WithIdentity("DailyBillingJobTrigger")
+                .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(dailyExecutionTime.Hours, dailyExecutionTime.Minutes))
+                .ForJob(job)
+                .Build();
+
+            return trigger;
+        }
+
+
+        /// <summary>
+        /// Gets the trigger details for failed payment process job
+        /// </summary>
+        /// <param name="job"></param>
+        /// <returns></returns>
+        private ITrigger GetFailedPaymentProcessTrigger(IJobDetail job)
+        {
+            //Trigger the created job
+            var dailyfailedPaymentExecutionTime = ServiceConfigurationKeys.DailyFailedRecordProcessStartTime;
+            var failedPaymentTrigger = TriggerBuilder.Create()
+                .WithIdentity("DailyFailedPaymentProcessJob")
+                .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(dailyfailedPaymentExecutionTime.Hours, dailyfailedPaymentExecutionTime.Minutes))
+                .ForJob(job)
+                .Build();
+
+            return failedPaymentTrigger;
+        }
+
+        /// <summary>
+        /// Stops the daily billing schedular
+        /// </summary>
+        public void Stop()
+        {
+            IScheduler scheduler = StdSchedulerFactory.GetDefaultScheduler();
+            scheduler.Shutdown();
+        }
+    }
+}
+
+
+/*
+ Jobs classes 
+*/
+
+ public class DailyBillingJob : IJob
+    {
+        public void Execute(IJobExecutionContext context)
+        {
+            //Do Whatever you want
+        }
+  }
+  
+ /*
+  Class to read keys
+ */
+ 
+  public static class ServiceConfigurationKeys
+    {
+        /// <summary>
+        /// Get Daily Execution Time 
+        /// </summary>
+        /// <returns></returns>
+        public static TimeSpan DailyBillingGenerationStartTime
+        {
+            get {
+
+                var strExecutionTime = ConfigurationManager.AppSettings[Constants.ConfigKeys.StartTime];
+                if (string.IsNullOrWhiteSpace(strExecutionTime))
+                {
+                    throw new InvalidOperationException("Start time is not defined in configuration file.");
+                }
+
+                try
+                {
+                    return DateTime.ParseExact(strExecutionTime.Trim(), "hh:mm tt", CultureInfo.InvariantCulture).TimeOfDay;
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException("Invlaid start time format in configuration file.");
+                }
+            }
+        }
+
+
+/*
+ Windows service code
+*/
+
+public partial class DemoService : ServiceBase
+    {
+        DailyJobScheduler _scheduler;
+
+        /// <summary>
+        /// Intialize the components
+        /// </summary>
+        public DemoService()
+        {
+            InitializeComponent();
+        }
+
+        /// <summary>
+        /// Windows service has been started
+        /// </summary>
+        protected override void OnStart(string[] args)
+        {
+            _scheduler = new DailyJobScheduler();
+            _scheduler.Start();
+        }
+
+        /// <summary>
+        /// Windows service has been stoped
+        /// </summary>
+        protected override void OnStop()
+        {
+            if (_scheduler != null)
+            {
+                _scheduler.Stop();
+            }
+        }
+    }
