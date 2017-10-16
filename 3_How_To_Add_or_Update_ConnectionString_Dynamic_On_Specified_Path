@@ -1,4 +1,14 @@
-private void AddUpdateConnectionString(string path,string connectionStringName, string server,string initialCatalog,string userName,string password,bool integratedSecurity=false)
+        /// <summary>
+        /// Adds or updates the connection string on specified path.
+        /// </summary>
+        /// <param name="path">physical path where config file is stored.</param>
+        /// <param name="connectionStringName">Connection string key name.</param>
+        /// <param name="server">Database server.</param>
+        /// <param name="initialCatalog">Database name.</param>
+        /// <param name="userName">Database user name.</param>
+        /// <param name="password">Database password.</param>
+        /// <param name="integratedSecurity">true or false</param>
+        private void AddUpdateConnectionString(string path,string connectionStringName, string server,string initialCatalog,string userName,string password,bool integratedSecurity=false)
         {
             bool isNew = false;
             XmlDocument doc = new XmlDocument();
@@ -39,4 +49,28 @@ private void AddUpdateConnectionString(string path,string connectionStringName, 
                 doc.DocumentElement.SelectNodes("connectionStrings")[0].AppendChild(node);
             }
             doc.Save(path);
+        }
+
+
+        /// <summary>
+        /// Test that the server is connected
+        /// </summary>
+        /// <param name="connectionString">The connection string</param>
+        /// <returns>true if the connection is opened</returns>
+        private static bool IsServerConnected(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) return false;
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                try
+                {
+                    connection.Open();
+                    return connection.State == ConnectionState.Open;
+                }
+                catch (SqlException)
+                {
+                    return false;
+                }
+            }
         }
