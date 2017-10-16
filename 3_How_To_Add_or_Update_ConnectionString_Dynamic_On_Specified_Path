@@ -1,0 +1,42 @@
+private void AddUpdateConnectionString(string path,string connectionStringName, string server,string initialCatalog,string userName,string password,bool integratedSecurity=false)
+        {
+            bool isNew = false;
+            XmlDocument doc = new XmlDocument();
+            doc.Load(path);
+            XmlNodeList list = doc.DocumentElement.SelectNodes(string.Format("connectionStrings/add[@name='{0}']", connectionStringName));
+            XmlNode node;
+            isNew = list.Count == 0;
+            if (isNew)
+            {
+                node = doc.CreateNode(XmlNodeType.Element, "add", null);
+                XmlAttribute attribute = doc.CreateAttribute("name");
+                attribute.Value = connectionStringName;
+                node.Attributes.Append(attribute);
+
+                attribute = doc.CreateAttribute("connectionString");
+                attribute.Value = "";
+                node.Attributes.Append(attribute);
+
+                attribute = doc.CreateAttribute("providerName");
+                attribute.Value = "System.Data.SqlClient";
+                node.Attributes.Append(attribute);
+            }
+            else
+            {
+                node = list[0];
+            }
+            string conString = node.Attributes["connectionString"].Value;
+            SqlConnectionStringBuilder conStringBuilder = new SqlConnectionStringBuilder(conString);
+
+            conStringBuilder.DataSource = server;
+            conStringBuilder.InitialCatalog = initialCatalog;
+            conStringBuilder.IntegratedSecurity = integratedSecurity;
+            conStringBuilder.UserID = userName;
+            conStringBuilder.Password = password;
+            node.Attributes["connectionString"].Value = conStringBuilder.ConnectionString;
+            if (isNew)
+            {
+                doc.DocumentElement.SelectNodes("connectionStrings")[0].AppendChild(node);
+            }
+            doc.Save(path);
+        }
